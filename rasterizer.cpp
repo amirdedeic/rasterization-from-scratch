@@ -8,9 +8,6 @@ using namespace std;
 
 // CONSTANTS (FIX LATER)
 
-
-
-
 // Window size constants
 const int Cw = 400;
 const int Ch = 400;
@@ -27,7 +24,8 @@ struct Vec3 {
 };
 
 struct Point {
-    int x, y;
+    int x;
+    float y;
 };
 
 struct Color {
@@ -49,15 +47,51 @@ void PutPixel(SDL_Renderer* renderer, int x, int y, Color color) {
 
 
 void DrawLine(SDL_Renderer* renderer, const Point& P0, const Point& P1, const Color& color){
-    float a = (P1.y - P0.y) / (P1.x - P0.x); 
-    float b = (P0.y - a * P0.x);
-
-    for (int x = P0.x; x < P1.x; x++){
-        float y = a*x + b;
-        PutPixel(renderer, x, y, color);
+    int dx = P1.x - P0.x;
+    int dy = P1.y - P0.y;
+    
+    // Handle vertical lines
+    if (dx == 0) {
+        int y_start = min(P0.y, P1.y);
+        int y_end = max(P0.y, P1.y);
+        for (int y = y_start; y <= y_end; y++) {
+            PutPixel(renderer, P0.x, y, color);
+        }
+        return;
     }
-
+    
+    // Swap points if P0 is to the right of P1
+    Point start = P0;
+    Point end = P1;
+    if (P0.x > P1.x) {
+        start = P1;
+        end = P0;
+    }
+    
+    // Check if line is steep (|slope| > 1)
+    if (abs(dy) > abs(dx)) {
+        // Iterate over y instead of x
+        int y_start = min(start.y, end.y);
+        int y_end = max(start.y, end.y);
+        float x = (start.y < end.y) ? start.x : end.x;
+        float a = (float)dx / dy;
+        
+        for (int y = y_start; y <= y_end; y++) {
+            PutPixel(renderer, (int)x, y, color);
+            x += a;
+        }
+    } else {
+        // Original approach for shallow lines
+        float a = (float)dy / dx;
+        float y = start.y;
+        
+        for (int x = start.x; x <= end.x; x++) {
+            PutPixel(renderer, x, (int)y, color);
+            y += a;
+        }
+    }
 }
+
 
 int main() {
 
@@ -69,20 +103,19 @@ int main() {
     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Cw, Ch, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
+    // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    // SDL_RenderClear(renderer);
     
 
-    bool needs_redraw = true;
     bool running = true;
     SDL_Event event;
-
+	
     // SDL_RenderPresent(renderer);
 
 
 
-    Point P0 = {10, 40};
-    Point P1 = {200, 300};
+    Point P1 = {-60, -200};
+    Point P0 = {0, 100};
 
     DrawLine(renderer, P0, P1, red);
     SDL_RenderPresent(renderer);
