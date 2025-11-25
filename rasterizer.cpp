@@ -27,7 +27,7 @@ struct Vec3 {
 
 struct Point {
     int x;
-    float y;
+    int y;
 };
 
 struct Color {
@@ -63,7 +63,7 @@ std::vector<float> Interpolate(int i0, float d0, int i1, float d1){
 }
 
 
-void DrawLine(SDL_Renderer* renderer, Point& P0, Point& P1, const Color& color){
+void DrawLine(SDL_Renderer* renderer, Point P0, Point P1, const Color& color){
     
     if (abs(P1.x - P0.x) > abs(P1.y - P0.y)){
         if (P0.x > P1.x){
@@ -84,6 +84,11 @@ void DrawLine(SDL_Renderer* renderer, Point& P0, Point& P1, const Color& color){
     }
 }
 
+void DrawWireframeTriangle(SDL_Renderer* renderer, Point P0, Point  P1, Point  P2, const Color& color){
+    DrawLine(renderer, P0, P1, color);
+    DrawLine(renderer, P1, P2, color);
+    DrawLine(renderer, P0, P2, color);
+}
 
 int main() {
 
@@ -105,15 +110,18 @@ int main() {
     // SDL_RenderPresent(renderer);
 
 
+    Point P0 = {0, 100}; 
+    Point P1 = {0, 0};
+    Point P2 = {100, 0};
 
-    Point P1 = {-60, -200};
-    Point P0 = {0, 100};
-    Point P3 = {-20, -60};
+    // DrawLine(renderer, P0, P1, red);
+    // DrawLine(renderer, P2, P1, red);
 
-    DrawLine(renderer, P0, P1, red);
-    DrawLine(renderer, P3, P1, red);
+    DrawWireframeTriangle(renderer, P0, P1, P2, red);
 
     SDL_RenderPresent(renderer);
+
+
 
     while (running) {
         while (SDL_PollEvent(&event)) {
