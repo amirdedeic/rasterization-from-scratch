@@ -1,8 +1,10 @@
 #include <cmath>
 #include <vector>
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <SDL2/SDL.h>
+#include <list>
 
 using namespace std;
 
@@ -46,48 +48,38 @@ void PutPixel(SDL_Renderer* renderer, int x, int y, Color color) {
 }
 
 
-void DrawLine(SDL_Renderer* renderer, const Point& P0, const Point& P1, const Color& color){
-    int dx = P1.x - P0.x;
-    int dy = P1.y - P0.y;
+std::vector<float> Interpolate(int i0, float d0, int i1, float d1){
+    if (i0 == i1) {
+        return {d0};
+    };
+    std::vector<float> values;
+    float a = (d1 - d0) / (i1 - i0);
+    float d = d0;
+    for (int i = i0; i <= i1; i++){
+        values.push_back(d);
+        d = d + a;
+    }
+    return values;
+}
+
+
+void DrawLine(SDL_Renderer* renderer, Point& P0, Point& P1, const Color& color){
     
-    // Handle vertical lines
-    if (dx == 0) {
-        int y_start = min(P0.y, P1.y);
-        int y_end = max(P0.y, P1.y);
-        for (int y = y_start; y <= y_end; y++) {
-            PutPixel(renderer, P0.x, y, color);
+    if (abs(P1.x - P0.x) > abs(P1.y - P0.y)){
+        if (P0.x > P1.x){
+            std::swap(P0, P1);   
         }
-        return;
-    }
-    
-    // Swap points if P0 is to the right of P1
-    Point start = P0;
-    Point end = P1;
-    if (P0.x > P1.x) {
-        start = P1;
-        end = P0;
-    }
-    
-    // Check if line is steep (|slope| > 1)
-    if (abs(dy) > abs(dx)) {
-        // Iterate over y instead of x
-        int y_start = min(start.y, end.y);
-        int y_end = max(start.y, end.y);
-        float x = (start.y < end.y) ? start.x : end.x;
-        float a = (float)dx / dy;
-        
-        for (int y = y_start; y <= y_end; y++) {
-            PutPixel(renderer, (int)x, y, color);
-            x += a;
+        std::vector<float> ys = Interpolate(P0.x, P0.y, P1.x, P1.y);
+        for (int x = P0.x; x <= P1.x; x++) {
+            PutPixel(renderer, x, ys[x - P0.x], color);
         }
     } else {
-        // Original approach for shallow lines
-        float a = (float)dy / dx;
-        float y = start.y;
-        
-        for (int x = start.x; x <= end.x; x++) {
-            PutPixel(renderer, x, (int)y, color);
-            y += a;
+        if (P0.y > P1.y){
+            std::swap(P0, P1);   
+        }
+        std::vector<float> xs = Interpolate(P0.y, P0.x, P1.y, P1.x);
+        for (int y = P0.y; y <= P1.y; y++) {
+            PutPixel(renderer, xs[y - P0.y], y, color);
         }
     }
 }
@@ -116,8 +108,11 @@ int main() {
 
     Point P1 = {-60, -200};
     Point P0 = {0, 100};
+    Point P3 = {-20, -60};
 
     DrawLine(renderer, P0, P1, red);
+    DrawLine(renderer, P3, P1, red);
+
     SDL_RenderPresent(renderer);
 
     while (running) {
