@@ -35,7 +35,7 @@ struct Color {
 };
 
 // Color constant
-Color red = {255, 255, 255};
+Color white = {255, 255, 255};
 
 
 
@@ -149,11 +149,11 @@ int main() {
     Point P1 = {0, 0};
     Point P2 = {100, 0};
 
-    // DrawLine(renderer, P0, P1, red);
-    // DrawLine(renderer, P2, P1, red);
+    // DrawLine(renderer, P0, P1, white);
+    // DrawLine(renderer, P2, P1, white);
 
-    DrawWireframeTriangle(renderer, P0, P1, P2, red);
-    DrawFilledTriangle(renderer, P0, P1, P2, red);
+    DrawWireframeTriangle(renderer, P0, P1, P2, white);
+    DrawFilledTriangle(renderer, P0, P1, P2, white);
 
     SDL_RenderPresent(renderer);
 
