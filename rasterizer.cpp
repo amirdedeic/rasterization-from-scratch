@@ -90,6 +90,41 @@ void DrawWireframeTriangle(SDL_Renderer* renderer, Point P0, Point  P1, Point  P
     DrawLine(renderer, P0, P2, color);
 }
 
+void DrawFilledTriangle(SDL_Renderer* renderer, Point P0, Point P1, Point P2, const Color& color){
+    if (P0.y > P1.y){std::swap(P0, P1);}
+    if (P1.y > P2.y){std::swap(P1, P2);}
+    if (P0.y > P2.y){std::swap(P0, P2);}
+
+    std::vector<float> x01 = Interpolate(P0.y, P0.x, P1.y, P1.x);
+    std::vector<float> x12 = Interpolate(P1.y, P1.x, P2.y, P2.x);
+    std::vector<float> x02 = Interpolate(P0.y, P0.x, P2.y, P2.x);
+
+    x01.pop_back();
+    std::vector<float> x012 = x01;
+    x012.insert(x012.end(), x12.begin(), x12.end());
+
+    std::vector<float> x_left;
+    std::vector<float> x_right;
+
+    int m = floor(x012.size() / 2);
+    if (x02[m] < x012[m]){
+        x_left = x02;
+        x_right = x012;
+    } else {
+        x_left = x012;
+        x_right = x02;
+    }
+    // Draw the hotizontal segments
+    for (int y = P0.y; y < P2.y; y++){
+        for (int x = x_left[y - P0.y]; x < x_right[y - P0.y]; x++){
+            PutPixel(renderer, x, y, color);
+        }
+    }
+    
+}
+
+
+
 int main() {
 
 
@@ -118,6 +153,7 @@ int main() {
     // DrawLine(renderer, P2, P1, red);
 
     DrawWireframeTriangle(renderer, P0, P1, P2, red);
+    DrawFilledTriangle(renderer, P0, P1, P2, red);
 
     SDL_RenderPresent(renderer);
 
