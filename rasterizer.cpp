@@ -18,12 +18,10 @@ const int Ch = 400;
 const float Vw = 1.5f;
 const float Vh = 1.5f;
 
+const float d = 0.5f;
+
 
 // TYPE DEF
-
-struct Vec3 {
-    float x, y, z;
-};
 
 struct Point {
     int x;
@@ -42,10 +40,37 @@ struct Color {
     }
 };
 
+struct Vec3 {
+    float x, y, z;
+};
+
+Point ViewportToCanvas(float x, float y) {
+    return {(int)(x * Cw / Vw), (int)(y * Ch / Vh)};
+}
+
+Point ProjectVertex(Vec3 v){
+    return ViewportToCanvas(v.x * d / v.z, v.y * d / v.z);
+}
+
+
 // Color constant
 Color green = {50, 180, 20};
 Color black = {0, 0, 0};
+Color blue = {0, 0, 255};
+Color red = {255, 0, 0};
 
+
+// Defining Vertices
+
+Vec3 VAf = {-1, 1, 1};
+Vec3 VBf = {1, 1, 1};
+Vec3 VCf = {1, -1, 1};
+Vec3 VDf = {-1, -1, 1};
+
+Vec3 VAb = {-1, 1, 2};
+Vec3 VBb = {1, 1, 2};
+Vec3 VCb = {1, -1, 2};
+Vec3 VDb = {-1, -1, 2};
 
 
 
@@ -198,29 +223,32 @@ int main() {
     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Cw, Ch, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-
     // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
-    
+
 
     bool running = true;
     SDL_Event event;
-	
-    // SDL_RenderPresent(renderer);
-
-
-    Point P0 = {0, 100}; 
-    Point P1 = {-100, -100};
-    Point P2 = {100, 0};
     
 
-    // DrawLine(renderer, P0, P1, green);
-    // DrawLine(renderer, P2, P1, green);
+    // The front face
+    DrawLine(renderer, ProjectVertex(VAf), ProjectVertex(VBf), blue);
+    DrawLine(renderer, ProjectVertex(VBf), ProjectVertex(VCf), blue);
+    DrawLine(renderer, ProjectVertex(VCf), ProjectVertex(VDf), blue);
+    DrawLine(renderer, ProjectVertex(VDf), ProjectVertex(VAf), blue);
 
-    DrawFilledTriangle(renderer, P0, P1, P2, green);
-    DrawFilledTriangleGradient(renderer, P0, P1, P2, 0.2, 0.8, 0.8, green);
-    
-    DrawWireframeTriangle(renderer, P0, P1, P2, black);
+    // The back face
+    DrawLine(renderer, ProjectVertex(VAb), ProjectVertex(VBb), red);
+    DrawLine(renderer, ProjectVertex(VBb), ProjectVertex(VCb), red);
+    DrawLine(renderer, ProjectVertex(VCb), ProjectVertex(VDb), red);
+    DrawLine(renderer, ProjectVertex(VDb), ProjectVertex(VAb), red);
+
+    // The front-to-back edges
+    DrawLine(renderer, ProjectVertex(VAf), ProjectVertex(VAb), green);
+    DrawLine(renderer, ProjectVertex(VBf), ProjectVertex(VBb), green);
+    DrawLine(renderer, ProjectVertex(VCf), ProjectVertex(VCb), green);
+    DrawLine(renderer, ProjectVertex(VDf), ProjectVertex(VDb), green);
+
     SDL_RenderPresent(renderer);
 
 
