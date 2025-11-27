@@ -32,10 +32,19 @@ struct Point {
 
 struct Color {
     int r, g, b;
+
+    Color operator*(float intensity) const {
+        return {
+            min(255, max(0, (int)(r * intensity))),
+            min(255, max(0, (int)(g * intensity))),
+            min(255, max(0, (int)(b * intensity)))
+        };
+    }
 };
 
 // Color constant
-Color white = {255, 255, 255};
+Color green = {50, 180, 20};
+Color black = {0, 0, 0};
 
 
 
@@ -123,7 +132,61 @@ void DrawFilledTriangle(SDL_Renderer* renderer, Point P0, Point P1, Point P2, co
     
 }
 
+void DrawFilledTriangleGradient(SDL_Renderer* renderer, Point P0, Point P1, Point P2, float h0, float h1, float h2, const Color& color){
 
+    if (h1 == -1){
+        DrawFilledTriangle(renderer, P0, P1, P2, color);
+    }
+    if (P0.y > P1.y){std::swap(P0, P1);}
+    if (P1.y > P2.y){std::swap(P1, P2);}
+    if (P0.y > P2.y){std::swap(P0, P2);}
+
+    // triangle verticies interpolation
+    std::vector<float> x01 = Interpolate(P0.y, P0.x, P1.y, P1.x);
+    std::vector<float> x12 = Interpolate(P1.y, P1.x, P2.y, P2.x);
+    std::vector<float> x02 = Interpolate(P0.y, P0.x, P2.y, P2.x);
+
+    // gradient verticies interpolation
+    std::vector<float> h01 = Interpolate(P0.y, h0, P1.y, h1);
+    std::vector<float> h12 = Interpolate(P1.y, h1, P2.y, h2);
+    std::vector<float> h02 = Interpolate(P0.y, h0, P2.y, h2);
+
+    x01.pop_back();
+    std::vector<float> x012 = x01;
+    x012.insert(x012.end(), x12.begin(), x12.end());
+
+    h01.pop_back();
+    std::vector<float> h012 = h01;
+    h012.insert(h012.end(), h12.begin(), h12.end());
+
+    std::vector<float> x_left, x_right, h_left, h_right;
+
+    int m = floor(x012.size() / 2);
+    if (x02[m] < x012[m]){
+        x_left = x02;
+        x_right = x012;
+        h_left = h02;
+        h_right = h012;
+    } else {
+        x_left = x012;
+        x_right = x02;
+        h_left = h012;
+        h_right = h02;
+    }
+
+    // Draw the hotizontal segments
+    for (int y = P0.y; y < P2.y; y++){
+        float x_left_this_y(x_left[y - P0.y]);
+        float x_right_this_y(x_right[y - P0.y]);
+        std::vector<float> h_segment = Interpolate(x_left[y - P0.y], h_left[y - P0.y], x_right[y - P0.y], h_right[y - P0.y]);
+
+        for (int x = x_left_this_y; x < x_right_this_y; x++){
+            Color shaded_color = color*h_segment[x - x_left_this_y];
+            PutPixel(renderer, x, y, shaded_color);
+        }
+    }
+    
+}
 
 int main() {
 
@@ -134,9 +197,10 @@ int main() {
     SDL_Window* window = SDL_CreateWindow("Rasterizer", 
     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Cw, Ch, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
     // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    // SDL_RenderClear(renderer);
+    SDL_RenderClear(renderer);
     
 
     bool running = true;
@@ -146,16 +210,19 @@ int main() {
 
 
     Point P0 = {0, 100}; 
-    Point P1 = {0, 0};
+    Point P1 = {-100, -100};
     Point P2 = {100, 0};
+    
 
-    // DrawLine(renderer, P0, P1, white);
-    // DrawLine(renderer, P2, P1, white);
+    // DrawLine(renderer, P0, P1, green);
+    // DrawLine(renderer, P2, P1, green);
 
-    DrawWireframeTriangle(renderer, P0, P1, P2, white);
-    DrawFilledTriangle(renderer, P0, P1, P2, white);
-
+    DrawFilledTriangle(renderer, P0, P1, P2, green);
+    DrawFilledTriangleGradient(renderer, P0, P1, P2, 0.2, 0.8, 0.8, green);
+    
+    DrawWireframeTriangle(renderer, P0, P1, P2, black);
     SDL_RenderPresent(renderer);
+
 
 
 
