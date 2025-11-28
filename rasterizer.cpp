@@ -18,7 +18,7 @@ const int Ch = 400;
 const float Vw = 1.5f;
 const float Vh = 1.5f;
 
-const float d = 0.5f;
+const float d = 1.0f;
 
 
 // TYPE DEF
@@ -44,6 +44,11 @@ struct Vec3 {
     float x, y, z;
 };
 
+struct triangle {
+    int a, b, c;
+    Color color;
+};
+
 Point ViewportToCanvas(float x, float y) {
     return {(int)(x * Cw / Vw), (int)(y * Ch / Vh)};
 }
@@ -54,10 +59,12 @@ Point ProjectVertex(Vec3 v){
 
 
 // Color constant
-Color green = {50, 180, 20};
-Color black = {0, 0, 0};
-Color blue = {0, 0, 255};
 Color red = {255, 0, 0};
+Color green = {0, 255, 0};
+Color blue = {0, 0, 255};
+Color yellow = {255, 255, 0};
+Color purple = {255, 0, 255};
+Color cyan = {0, 255, 255};
 
 
 // Defining Vertices
@@ -67,10 +74,43 @@ Vec3 VBf = {1, 1, 1};
 Vec3 VCf = {1, -1, 1};
 Vec3 VDf = {-1, -1, 1};
 
-Vec3 VAb = {-1, 1, 2};
-Vec3 VBb = {1, 1, 2};
-Vec3 VCb = {1, -1, 2};
-Vec3 VDb = {-1, -1, 2};
+Vec3 VAb = {-3, 1, 2};
+Vec3 VBb = {-1, 1, 2};
+Vec3 VCb = {-1, -1, 2};
+Vec3 VDb = {-2, -1, 2};
+
+
+// Defining Vertices for model space of cube
+std::vector<Vec3> vertices = {
+    { 1,  1,  1},
+    {-1,  1,  1},
+    {-1, -1,  1},
+    { 1, -1,  1},
+    { 1,  1, -1},
+    {-1,  1, -1},
+    {-1, -1, -1},
+    { 1, -1, -1}
+};
+
+std::vector<triangle> triangles = {
+    {0, 1, 2, red},
+    {0, 2, 3, red},
+
+    {4, 0, 3, green},
+    {4, 3, 7, green},
+
+    {5, 4, 7, blue},
+    {5, 7, 6, blue},
+
+    {1, 5, 6, yellow},
+    {1, 6, 2, yellow},
+
+    {4, 5, 1, purple},
+    {4, 1, 0, purple},
+
+    {2, 6, 7, cyan},
+    {2, 7, 3, cyan}
+};
 
 
 
@@ -213,46 +253,55 @@ void DrawFilledTriangleGradient(SDL_Renderer* renderer, Point P0, Point P1, Poin
     
 }
 
+void RenderTriangle(SDL_Renderer* renderer, triangle T, std::vector<Vec3> projected)
+{
+    DrawWireframeTriangle(
+        renderer,
+        ProjectVertex(projected[T.a]),
+        ProjectVertex(projected[T.b]),
+        ProjectVertex(projected[T.c]),
+        T.color
+    );
+}
+
+void RenderObject(SDL_Renderer* renderer, const vector<Vec3>& vertices, const vector<triangle>& triangles){
+    // Translation vector: move cube 7 units forward (Z+) and 1.5 units left (X-)
+    Vec3 translation = {-1.5f, 0.0f, 7.0f};
+    
+    std::vector<Vec3> projected = {};
+    for (size_t v = 0; v < vertices.size(); v++){
+        // Translate each vertex: V' = V + T
+        Vec3 translated = {
+            vertices[v].x + translation.x,
+            vertices[v].y + translation.y,
+            vertices[v].z + translation.z
+        };
+        projected.push_back(translated);
+    }
+
+    for (size_t t = 0; t < triangles.size(); t++){
+        RenderTriangle(renderer, triangles[t], projected);
+    }
+    
+}
+
 int main() {
 
-
     SDL_Init(SDL_INIT_VIDEO);
-    // omp_set_num_threads(8);
     
     SDL_Window* window = SDL_CreateWindow("Rasterizer", 
     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Cw, Ch, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
-
 
     bool running = true;
     SDL_Event event;
     
-
-    // The front face
-    DrawLine(renderer, ProjectVertex(VAf), ProjectVertex(VBf), blue);
-    DrawLine(renderer, ProjectVertex(VBf), ProjectVertex(VCf), blue);
-    DrawLine(renderer, ProjectVertex(VCf), ProjectVertex(VDf), blue);
-    DrawLine(renderer, ProjectVertex(VDf), ProjectVertex(VAf), blue);
-
-    // The back face
-    DrawLine(renderer, ProjectVertex(VAb), ProjectVertex(VBb), red);
-    DrawLine(renderer, ProjectVertex(VBb), ProjectVertex(VCb), red);
-    DrawLine(renderer, ProjectVertex(VCb), ProjectVertex(VDb), red);
-    DrawLine(renderer, ProjectVertex(VDb), ProjectVertex(VAb), red);
-
-    // The front-to-back edges
-    DrawLine(renderer, ProjectVertex(VAf), ProjectVertex(VAb), green);
-    DrawLine(renderer, ProjectVertex(VBf), ProjectVertex(VBb), green);
-    DrawLine(renderer, ProjectVertex(VCf), ProjectVertex(VCb), green);
-    DrawLine(renderer, ProjectVertex(VDf), ProjectVertex(VDb), green);
+    // Render the cube using the triangle system
+    RenderObject(renderer, vertices, triangles);
 
     SDL_RenderPresent(renderer);
-
-
-
 
     while (running) {
         while (SDL_PollEvent(&event)) {
@@ -263,7 +312,7 @@ int main() {
                 running = false;
             }
         }
-        SDL_Delay(16); // Prevents CPU from spinning at 100%
+        SDL_Delay(16);
     }
 
     SDL_DestroyRenderer(renderer);
