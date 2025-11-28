@@ -18,7 +18,7 @@ const int Ch = 400;
 const float Vw = 1.5f;
 const float Vh = 1.5f;
 
-const float d = 1.0f;
+const float d = 0.5f;
 
 
 // TYPE DEF
@@ -47,6 +47,17 @@ struct Vec3 {
 struct triangle {
     int a, b, c;
     Color color;
+};
+
+struct Model {
+    string name;
+    vector<Vec3> vertices;
+    vector<triangle> triangles;
+};
+
+struct Instance {
+    Model* model;
+    Vec3 position;
 };
 
 Point ViewportToCanvas(float x, float y) {
@@ -81,35 +92,43 @@ Vec3 VDb = {-2, -1, 2};
 
 
 // Defining Vertices for model space of cube
-std::vector<Vec3> vertices = {
-    { 1,  1,  1},
-    {-1,  1,  1},
-    {-1, -1,  1},
-    { 1, -1,  1},
-    { 1,  1, -1},
-    {-1,  1, -1},
-    {-1, -1, -1},
-    { 1, -1, -1}
+Model cube = {
+    "cube",
+    {
+        { 1,  1,  1},
+        {-1,  1,  1},
+        {-1, -1,  1},
+        { 1, -1,  1},
+        { 1,  1, -1},
+        {-1,  1, -1},
+        {-1, -1, -1},
+        { 1, -1, -1}
+    },
+    {
+        {0, 1, 2, red},
+        {0, 2, 3, red},
+
+        {4, 0, 3, green},
+        {4, 3, 7, green},
+
+        {5, 4, 7, blue},
+        {5, 7, 6, blue},
+
+        {1, 5, 6, yellow},
+        {1, 6, 2, yellow},
+
+        {4, 5, 1, purple},
+        {4, 1, 0, purple},
+
+        {2, 6, 7, cyan},
+        {2, 7, 3, cyan}
+    }
 };
 
-std::vector<triangle> triangles = {
-    {0, 1, 2, red},
-    {0, 2, 3, red},
-
-    {4, 0, 3, green},
-    {4, 3, 7, green},
-
-    {5, 4, 7, blue},
-    {5, 7, 6, blue},
-
-    {1, 5, 6, yellow},
-    {1, 6, 2, yellow},
-
-    {4, 5, 1, purple},
-    {4, 1, 0, purple},
-
-    {2, 6, 7, cyan},
-    {2, 7, 3, cyan}
+// Create instances of the cube
+vector<Instance> instances = {
+    {&cube, {-1.5f, 0.0f, 7.0f}},
+    {&cube, {1.25f, 2.5f, 7.5f}}
 };
 
 
@@ -253,7 +272,7 @@ void DrawFilledTriangleGradient(SDL_Renderer* renderer, Point P0, Point P1, Poin
     
 }
 
-void RenderTriangle(SDL_Renderer* renderer, triangle T, std::vector<Vec3> projected)
+void RenderTriangle(SDL_Renderer* renderer, const triangle& T, const vector<Vec3>& projected)
 {
     DrawWireframeTriangle(
         renderer,
@@ -264,25 +283,30 @@ void RenderTriangle(SDL_Renderer* renderer, triangle T, std::vector<Vec3> projec
     );
 }
 
-void RenderObject(SDL_Renderer* renderer, const vector<Vec3>& vertices, const vector<triangle>& triangles){
-    // Translation vector: move cube 7 units forward (Z+) and 1.5 units left (X-)
-    Vec3 translation = {-1.5f, 0.0f, 7.0f};
+void RenderInstance(SDL_Renderer* renderer, const Instance& instance) {
+    vector<Vec3> projected;
+    const Model* model = instance.model;
     
-    std::vector<Vec3> projected = {};
-    for (size_t v = 0; v < vertices.size(); v++){
-        // Translate each vertex: V' = V + T
+    // Translate each vertex by the instance position
+    for (size_t v = 0; v < model->vertices.size(); v++) {
         Vec3 translated = {
-            vertices[v].x + translation.x,
-            vertices[v].y + translation.y,
-            vertices[v].z + translation.z
+            model->vertices[v].x + instance.position.x,
+            model->vertices[v].y + instance.position.y,
+            model->vertices[v].z + instance.position.z
         };
         projected.push_back(translated);
     }
-
-    for (size_t t = 0; t < triangles.size(); t++){
-        RenderTriangle(renderer, triangles[t], projected);
-    }
     
+    // Render all triangles
+    for (size_t t = 0; t < model->triangles.size(); t++) {
+        RenderTriangle(renderer, model->triangles[t], projected);
+    }
+}
+
+void RenderScene(SDL_Renderer* renderer, const vector<Instance>& instances) {
+    for (size_t i = 0; i < instances.size(); i++) {
+        RenderInstance(renderer, instances[i]);
+    }
 }
 
 int main() {
@@ -298,8 +322,8 @@ int main() {
     bool running = true;
     SDL_Event event;
     
-    // Render the cube using the triangle system
-    RenderObject(renderer, vertices, triangles);
+    // Render the scene with all instances
+    RenderScene(renderer, instances);
 
     SDL_RenderPresent(renderer);
 
