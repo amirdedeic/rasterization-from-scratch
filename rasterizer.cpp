@@ -18,7 +18,7 @@ const int Ch = 400;
 const float Vw = 1.5f;
 const float Vh = 1.5f;
 
-const float d = 0.5f;
+const float d = 0.8f;
 
 
 // TYPE DEF
@@ -42,6 +42,9 @@ struct Color {
 
 struct Vec3 {
     float x, y, z;
+    Vec3 operator*(float t) const {
+        return {x * t, y * t, z * t};
+    }
 };
 
 struct triangle {
@@ -55,9 +58,33 @@ struct Model {
     vector<triangle> triangles;
 };
 
+
 struct Instance {
     Model* model;
     Vec3 position;
+    double yaw; 
+    double pitch;
+    
+
+    // model->vertices[v]
+    Vec3 transform_vertex(Vec3 v, double yaw, double pitch){
+        // rotation
+
+        float cy = cos(yaw);
+        float sy = sin(yaw);
+        float cp = cos(pitch);
+        float sp = sin(pitch);
+
+        return v = {
+        cy*v.x + sy*sp*v.y + sy*cp*v.z,
+        0*v.x + cp*v.y + -sp*v.z,
+        -sy*v.x + cy*sp*v.y + cy*cp*v.z};
+
+        // translation
+
+
+    };
+
 };
 
 Point ViewportToCanvas(float x, float y) {
@@ -80,15 +107,6 @@ Color cyan = {0, 255, 255};
 
 // Defining Vertices
 
-Vec3 VAf = {-1, 1, 1};
-Vec3 VBf = {1, 1, 1};
-Vec3 VCf = {1, -1, 1};
-Vec3 VDf = {-1, -1, 1};
-
-Vec3 VAb = {-3, 1, 2};
-Vec3 VBb = {-1, 1, 2};
-Vec3 VCb = {-1, -1, 2};
-Vec3 VDb = {-2, -1, 2};
 
 
 // Defining Vertices for model space of cube
@@ -127,8 +145,9 @@ Model cube = {
 
 // Create instances of the cube
 vector<Instance> instances = {
-    {&cube, {-1.5f, 0.0f, 7.0f}},
-    {&cube, {1.25f, 2.5f, 7.5f}}
+    {&cube, {-1.5f, 0.0f, 7.0f}, 30, 30},
+    {&cube, {1.25f, 2.5f, 7.5f}, 40, 10},
+    {&cube, {1.25f, -4.5f, 7.5f}, 180, 82},
 };
 
 
@@ -283,16 +302,23 @@ void RenderTriangle(SDL_Renderer* renderer, const triangle& T, const vector<Vec3
     );
 }
 
-void RenderInstance(SDL_Renderer* renderer, const Instance& instance) {
+void RenderInstance(SDL_Renderer* renderer, Instance& instance) {
     vector<Vec3> projected;
-    const Model* model = instance.model;
+    Model* model = instance.model;
     
     // Translate each vertex by the instance position
     for (size_t v = 0; v < model->vertices.size(); v++) {
+
+        Vec3 transformed = instance.transform_vertex(model->vertices[v], instance.yaw, instance.pitch);
+
         Vec3 translated = {
-            model->vertices[v].x + instance.position.x,
-            model->vertices[v].y + instance.position.y,
-            model->vertices[v].z + instance.position.z
+            // model->vertices[v].x + instance.position.x,
+            // model->vertices[v].y + instance.position.y,
+            // model->vertices[v].z + instance.position.z
+
+            transformed.x + instance.position.x,
+            transformed.y + instance.position.y,
+            transformed.z + instance.position.z
         };
         projected.push_back(translated);
     }
@@ -303,7 +329,7 @@ void RenderInstance(SDL_Renderer* renderer, const Instance& instance) {
     }
 }
 
-void RenderScene(SDL_Renderer* renderer, const vector<Instance>& instances) {
+void RenderScene(SDL_Renderer* renderer, vector<Instance>& instances) {
     for (size_t i = 0; i < instances.size(); i++) {
         RenderInstance(renderer, instances[i]);
     }
@@ -323,9 +349,6 @@ int main() {
     SDL_Event event;
     
     // Render the scene with all instances
-    RenderScene(renderer, instances);
-
-    SDL_RenderPresent(renderer);
 
     while (running) {
         while (SDL_PollEvent(&event)) {
@@ -336,7 +359,20 @@ int main() {
                 running = false;
             }
         }
-        SDL_Delay(16);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderClear(renderer);
+        RenderScene(renderer, instances);
+        SDL_RenderPresent(renderer);
+        SDL_Delay(50);
+
+        instances[0].yaw += 0.03;
+        instances[0].pitch += 0.01;
+
+        instances[1].yaw += 0.01;
+        instances[1].pitch -= 0.02;
+
+        instances[2].yaw -= 0.02;
+        instances[2].pitch -= 0.02;
     }
 
     SDL_DestroyRenderer(renderer);
