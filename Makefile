@@ -1,5 +1,5 @@
 CXX = g++ -fopenmp
-CXXFLAGS = -std=c++17 -Wall -Wextra
+CXXFLAGS = -I/usr/include/eigen3 -std=c++17 -Wall -Wextra
 LDFLAGS = -lSDL2
 TARGET = rasterizer
 SRC = rasterizer.cpp

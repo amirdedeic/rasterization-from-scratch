@@ -4,25 +4,20 @@
 #include <chrono>
 #include <iostream>
 #include <SDL2/SDL.h>
-#include <list>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 using namespace std;
+using namespace Eigen;
 
-// CONSTANTS (FIX LATER)
-
-// Window size constants
+// CONSTANTS
 const int Cw = 400;
 const int Ch = 400;
-
-// Viewport size constants
 const float Vw = 1.5f;
 const float Vh = 1.5f;
-
 const float d = 0.8f;
 
-
 // TYPE DEF
-
 struct Point {
     int x;
     int y;
@@ -40,63 +35,82 @@ struct Color {
     }
 };
 
-struct Vec3 {
-    float x, y, z;
-    Vec3 operator*(float t) const {
-        return {x * t, y * t, z * t};
-    }
-};
-
 struct triangle {
     int a, b, c;
     Color color;
 };
 
-struct Model {
-    string name;
-    vector<Vec3> vertices;
-    vector<triangle> triangles;
-};
+struct Camera {
+    Vector3f position;
+    float yaw;
+    float pitch;
 
-
-struct Instance {
-    Model* model;
-    Vec3 position;
-    double yaw; 
-    double pitch;
-    
-
-    // model->vertices[v]
-    Vec3 transform_vertex(Vec3 v, double yaw, double pitch){
-        // rotation
-
+    Matrix4f GetCameraMatrix() const {
+        // Create rotation matrix
         float cy = cos(yaw);
         float sy = sin(yaw);
         float cp = cos(pitch);
         float sp = sin(pitch);
 
-        return v = {
-        cy*v.x + sy*sp*v.y + sy*cp*v.z,
-        0*v.x + cp*v.y + -sp*v.z,
-        -sy*v.x + cy*sp*v.y + cy*cp*v.z};
+        Matrix4f rotation = Matrix4f::Identity();
+        rotation(0, 0) = cy;   rotation(0, 1) = sy*sp;  rotation(0, 2) = sy*cp;
+        rotation(1, 0) = 0;    rotation(1, 1) = cp;     rotation(1, 2) = -sp;
+        rotation(2, 0) = -sy;  rotation(2, 1) = cy*sp;  rotation(2, 2) = cy*cp;
 
-        // translation
+        // Create translation matrix
+        Matrix4f translation = Matrix4f::Identity();
+        translation(0, 3) = -position.x();
+        translation(1, 3) = -position.y();
+        translation(2, 3) = -position.z();
 
-
-    };
-
+        // Combine: Camera = Rotation * Translation
+        return rotation * translation;
+    }
 };
 
-Point ViewportToCanvas(float x, float y) {
-    return {(int)(x * Cw / Vw), (int)(y * Ch / Vh)};
-}
+struct Model {
+    string name;
+    vector<Vector4f> vertices;  // Homogeneous coordinates
+    vector<triangle> triangles;
+};
 
-Point ProjectVertex(Vec3 v){
-    return ViewportToCanvas(v.x * d / v.z, v.y * d / v.z);
-}
+struct Instance {
+    Model* model;
+    Vector3f position;
+    float yaw;
+    float pitch;
+    float scale;
 
+    Matrix4f GetModelMatrix() const {
+        // Scale matrix
+        Matrix4f scaleMatrix = Matrix4f::Identity();
+        scaleMatrix(0, 0) = scale;
+        scaleMatrix(1, 1) = scale;
+        scaleMatrix(2, 2) = scale;
 
-// Color constant
+        // Rotation matrix
+        float cy = cos(yaw);
+        float sy = sin(yaw);
+        float cp = cos(pitch);
+        float sp = sin(pitch);
+
+        Matrix4f rotation = Matrix4f::Identity();
+        rotation(0, 0) = cy;   rotation(0, 1) = sy*sp;  rotation(0, 2) = sy*cp;
+        rotation(1, 0) = 0;    rotation(1, 1) = cp;     rotation(1, 2) = -sp;
+        rotation(2, 0) = -sy;  rotation(2, 1) = cy*sp;  rotation(2, 2) = cy*cp;
+
+        // Translation matrix
+        Matrix4f translation = Matrix4f::Identity();
+        translation(0, 3) = position.x();
+        translation(1, 3) = position.y();
+        translation(2, 3) = position.z();
+
+        // Combine: Model = Translation * Rotation * Scale
+        return translation * rotation * scaleMatrix;
+    }
+};
+
+// Color constants
 Color red = {255, 0, 0};
 Color green = {0, 255, 0};
 Color blue = {0, 0, 255};
@@ -104,195 +118,112 @@ Color yellow = {255, 255, 0};
 Color purple = {255, 0, 255};
 Color cyan = {0, 255, 255};
 
+// Create projection matrix
+Matrix4f GetProjectionMatrix() {
+    Matrix4f proj = Matrix4f::Identity();
+    proj(0, 0) = d * Cw / Vw;
+    proj(1, 1) = d * Ch / Vh;
+    proj(2, 2) = 1;
+    proj(3, 2) = 1.0f / d;  // w = z/d for perspective
+    proj(3, 3) = 0;
+    return proj;
+}
 
-// Defining Vertices
-
-
-
-// Defining Vertices for model space of cube
-Model cube = {
+// Define cube model
+Model cubeModel = {
     "cube",
     {
-        { 1,  1,  1},
-        {-1,  1,  1},
-        {-1, -1,  1},
-        { 1, -1,  1},
-        { 1,  1, -1},
-        {-1,  1, -1},
-        {-1, -1, -1},
-        { 1, -1, -1}
+        Vector4f(1, 1, 1, 1),
+        Vector4f(-1, 1, 1, 1),
+        Vector4f(-1, -1, 1, 1),
+        Vector4f(1, -1, 1, 1),
+        Vector4f(1, 1, -1, 1),
+        Vector4f(-1, 1, -1, 1),
+        Vector4f(-1, -1, -1, 1),
+        Vector4f(1, -1, -1, 1)
     },
     {
         {0, 1, 2, red},
         {0, 2, 3, red},
-
         {4, 0, 3, green},
         {4, 3, 7, green},
-
         {5, 4, 7, blue},
         {5, 7, 6, blue},
-
         {1, 5, 6, yellow},
         {1, 6, 2, yellow},
-
         {4, 5, 1, purple},
         {4, 1, 0, purple},
-
         {2, 6, 7, cyan},
         {2, 7, 3, cyan}
     }
 };
 
-// Create instances of the cube
+// Create camera
+Camera camera = {Vector3f(0, 0, 0), 0, 0};
+
+// Create instances
 vector<Instance> instances = {
-    {&cube, {-1.5f, 0.0f, 7.0f}, 30, 30},
-    {&cube, {1.25f, 2.5f, 7.5f}, 40, 10},
-    {&cube, {1.25f, -4.5f, 7.5f}, 180, 82},
+    {&cubeModel, Vector3f(-1.5f, 0.0f, 7.0f), 0.5f, 0.5f, 1.0f},
+    {&cubeModel, Vector3f(1.25f, 2.5f, 7.5f), 0.7f, 0.2f, 1.0f},
+    {&cubeModel, Vector3f(1.25f, -4.5f, 7.5f), 3.14f, 1.4f, 1.0f}
 };
 
-
-
 // FUNCTION DEF
-
 void PutPixel(SDL_Renderer* renderer, int x, int y, Color color) {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
     SDL_RenderDrawPoint(renderer, Cw/2 + x, Ch/2 - y);
 }
 
+Point ProjectVertex(const Vector4f& v) {
+    // Canonicalize: divide by w
+    float x = v.x() / v.w();
+    float y = v.y() / v.w();
+    
+    // Convert to canvas coordinates
+    return {(int)(x), (int)(y)};
+}
 
-std::vector<float> Interpolate(int i0, float d0, int i1, float d1){
+vector<float> Interpolate(int i0, float d0, int i1, float d1) {
     if (i0 == i1) {
         return {d0};
-    };
-    std::vector<float> values;
+    }
+    vector<float> values;
     float a = (d1 - d0) / (i1 - i0);
     float d = d0;
-    for (int i = i0; i <= i1; i++){
+    for (int i = i0; i <= i1; i++) {
         values.push_back(d);
         d = d + a;
     }
     return values;
 }
 
-
-void DrawLine(SDL_Renderer* renderer, Point P0, Point P1, const Color& color){
-    
-    if (abs(P1.x - P0.x) > abs(P1.y - P0.y)){
-        if (P0.x > P1.x){
-            std::swap(P0, P1);   
+void DrawLine(SDL_Renderer* renderer, Point P0, Point P1, const Color& color) {
+    if (abs(P1.x - P0.x) > abs(P1.y - P0.y)) {
+        if (P0.x > P1.x) {
+            swap(P0, P1);   
         }
-        std::vector<float> ys = Interpolate(P0.x, P0.y, P1.x, P1.y);
+        vector<float> ys = Interpolate(P0.x, P0.y, P1.x, P1.y);
         for (int x = P0.x; x <= P1.x; x++) {
             PutPixel(renderer, x, ys[x - P0.x], color);
         }
     } else {
-        if (P0.y > P1.y){
-            std::swap(P0, P1);   
+        if (P0.y > P1.y) {
+            swap(P0, P1);   
         }
-        std::vector<float> xs = Interpolate(P0.y, P0.x, P1.y, P1.x);
+        vector<float> xs = Interpolate(P0.y, P0.x, P1.y, P1.x);
         for (int y = P0.y; y <= P1.y; y++) {
             PutPixel(renderer, xs[y - P0.y], y, color);
         }
     }
 }
 
-void DrawWireframeTriangle(SDL_Renderer* renderer, Point P0, Point  P1, Point  P2, const Color& color){
+void DrawWireframeTriangle(SDL_Renderer* renderer, Point P0, Point P1, Point P2, const Color& color) {
     DrawLine(renderer, P0, P1, color);
     DrawLine(renderer, P1, P2, color);
     DrawLine(renderer, P0, P2, color);
 }
 
-void DrawFilledTriangle(SDL_Renderer* renderer, Point P0, Point P1, Point P2, const Color& color){
-    if (P0.y > P1.y){std::swap(P0, P1);}
-    if (P1.y > P2.y){std::swap(P1, P2);}
-    if (P0.y > P2.y){std::swap(P0, P2);}
-
-    std::vector<float> x01 = Interpolate(P0.y, P0.x, P1.y, P1.x);
-    std::vector<float> x12 = Interpolate(P1.y, P1.x, P2.y, P2.x);
-    std::vector<float> x02 = Interpolate(P0.y, P0.x, P2.y, P2.x);
-
-    x01.pop_back();
-    std::vector<float> x012 = x01;
-    x012.insert(x012.end(), x12.begin(), x12.end());
-
-    std::vector<float> x_left;
-    std::vector<float> x_right;
-
-    int m = floor(x012.size() / 2);
-    if (x02[m] < x012[m]){
-        x_left = x02;
-        x_right = x012;
-    } else {
-        x_left = x012;
-        x_right = x02;
-    }
-    // Draw the hotizontal segments
-    for (int y = P0.y; y < P2.y; y++){
-        for (int x = x_left[y - P0.y]; x < x_right[y - P0.y]; x++){
-            PutPixel(renderer, x, y, color);
-        }
-    }
-    
-}
-
-void DrawFilledTriangleGradient(SDL_Renderer* renderer, Point P0, Point P1, Point P2, float h0, float h1, float h2, const Color& color){
-
-    if (h1 == -1){
-        DrawFilledTriangle(renderer, P0, P1, P2, color);
-    }
-    if (P0.y > P1.y){std::swap(P0, P1);}
-    if (P1.y > P2.y){std::swap(P1, P2);}
-    if (P0.y > P2.y){std::swap(P0, P2);}
-
-    // triangle verticies interpolation
-    std::vector<float> x01 = Interpolate(P0.y, P0.x, P1.y, P1.x);
-    std::vector<float> x12 = Interpolate(P1.y, P1.x, P2.y, P2.x);
-    std::vector<float> x02 = Interpolate(P0.y, P0.x, P2.y, P2.x);
-
-    // gradient verticies interpolation
-    std::vector<float> h01 = Interpolate(P0.y, h0, P1.y, h1);
-    std::vector<float> h12 = Interpolate(P1.y, h1, P2.y, h2);
-    std::vector<float> h02 = Interpolate(P0.y, h0, P2.y, h2);
-
-    x01.pop_back();
-    std::vector<float> x012 = x01;
-    x012.insert(x012.end(), x12.begin(), x12.end());
-
-    h01.pop_back();
-    std::vector<float> h012 = h01;
-    h012.insert(h012.end(), h12.begin(), h12.end());
-
-    std::vector<float> x_left, x_right, h_left, h_right;
-
-    int m = floor(x012.size() / 2);
-    if (x02[m] < x012[m]){
-        x_left = x02;
-        x_right = x012;
-        h_left = h02;
-        h_right = h012;
-    } else {
-        x_left = x012;
-        x_right = x02;
-        h_left = h012;
-        h_right = h02;
-    }
-
-    // Draw the hotizontal segments
-    for (int y = P0.y; y < P2.y; y++){
-        float x_left_this_y(x_left[y - P0.y]);
-        float x_right_this_y(x_right[y - P0.y]);
-        std::vector<float> h_segment = Interpolate(x_left[y - P0.y], h_left[y - P0.y], x_right[y - P0.y], h_right[y - P0.y]);
-
-        for (int x = x_left_this_y; x < x_right_this_y; x++){
-            Color shaded_color = color*h_segment[x - x_left_this_y];
-            PutPixel(renderer, x, y, shaded_color);
-        }
-    }
-    
-}
-
-void RenderTriangle(SDL_Renderer* renderer, const triangle& T, const vector<Vec3>& projected)
-{
+void RenderTriangle(SDL_Renderer* renderer, const triangle& T, const vector<Vector4f>& projected) {
     DrawWireframeTriangle(
         renderer,
         ProjectVertex(projected[T.a]),
@@ -302,25 +233,13 @@ void RenderTriangle(SDL_Renderer* renderer, const triangle& T, const vector<Vec3
     );
 }
 
-void RenderInstance(SDL_Renderer* renderer, Instance& instance) {
-    vector<Vec3> projected;
-    Model* model = instance.model;
+void RenderModel(SDL_Renderer* renderer, const Model* model, const Matrix4f& transform) {
+    vector<Vector4f> projected;
     
-    // Translate each vertex by the instance position
+    // Transform all vertices
     for (size_t v = 0; v < model->vertices.size(); v++) {
-
-        Vec3 transformed = instance.transform_vertex(model->vertices[v], instance.yaw, instance.pitch);
-
-        Vec3 translated = {
-            // model->vertices[v].x + instance.position.x,
-            // model->vertices[v].y + instance.position.y,
-            // model->vertices[v].z + instance.position.z
-
-            transformed.x + instance.position.x,
-            transformed.y + instance.position.y,
-            transformed.z + instance.position.z
-        };
-        projected.push_back(translated);
+        Vector4f transformed = transform * model->vertices[v];
+        projected.push_back(transformed);
     }
     
     // Render all triangles
@@ -329,27 +248,32 @@ void RenderInstance(SDL_Renderer* renderer, Instance& instance) {
     }
 }
 
-void RenderScene(SDL_Renderer* renderer, vector<Instance>& instances) {
+void RenderScene(SDL_Renderer* renderer, vector<Instance>& instances, const Camera& camera) {
+    // Create projection and camera matrices (computed once per frame)
+    Matrix4f MProjection = GetProjectionMatrix();
+    Matrix4f MCamera = camera.GetCameraMatrix();
+    
+    // Render each instance
     for (size_t i = 0; i < instances.size(); i++) {
-        RenderInstance(renderer, instances[i]);
+        Matrix4f MModel = instances[i].GetModelMatrix();
+        
+        // Combined transform: F = Projection * Camera * Model
+        Matrix4f transform = MProjection * MCamera * MModel;
+        
+        RenderModel(renderer, instances[i].model, transform);
     }
 }
 
 int main() {
-
     SDL_Init(SDL_INIT_VIDEO);
     
     SDL_Window* window = SDL_CreateWindow("Rasterizer", 
-    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Cw, Ch, SDL_WINDOW_SHOWN);
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Cw, Ch, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderClear(renderer);
 
     bool running = true;
     SDL_Event event;
     
-    // Render the scene with all instances
-
     while (running) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
@@ -359,20 +283,24 @@ int main() {
                 running = false;
             }
         }
+        
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
-        RenderScene(renderer, instances);
+        
+        RenderScene(renderer, instances, camera);
+        
         SDL_RenderPresent(renderer);
         SDL_Delay(50);
 
-        instances[0].yaw += 0.03;
-        instances[0].pitch += 0.01;
+        // Animate instances
+        instances[0].yaw += 0.03f;
+        instances[0].pitch += 0.01f;
 
-        instances[1].yaw += 0.01;
-        instances[1].pitch -= 0.02;
+        instances[1].yaw += 0.01f;
+        instances[1].pitch -= 0.02f;
 
-        instances[2].yaw -= 0.02;
-        instances[2].pitch -= 0.02;
+        instances[2].yaw -= 0.02f;
+        instances[2].pitch -= 0.02f;
     }
 
     SDL_DestroyRenderer(renderer);
